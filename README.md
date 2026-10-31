@@ -1,5 +1,7 @@
 # LG TV Screen
 
+[![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kiwaili&repository=home-assistant-lg-tv&category=integration)
+
 Home Assistant custom integration that captures a still of what an LG webOS TV is showing. Written for a **32LM6300PCB on webOS 4.10**. The same screenshot call works on other webOS 4 sets.
 
 The TV has no video stream for the panel. Each refresh is a new JPEG. On webOS 4 the picture, including HDMI and streaming apps, comes from `com.webos.service.tv.capture/executeOneShot` with method `SCREEN_WITH_SOURCE_VIDEO`. The older `tv/executeOneShot` `DISPLAY` call often returns only the graphics plane, which is a black video area.
@@ -15,13 +17,27 @@ Add **LG TV Screen** and select that TV. Capture sends requests on the websocket
 
 ## Install
 
+### Home Assistant Community Store
+
+[Open this repository in HACS](https://my.home-assistant.io/redirect/hacs_repository/?owner=kiwaili&repository=home-assistant-lg-tv&category=integration). If it is not in your HACS yet, add it as a custom repository:
+
+1. HACS → Integrations → menu → **Custom repositories**
+2. Repository: `https://github.com/kiwaili/home-assistant-lg-tv`
+3. Category: **Integration**
+4. Add the repository, then download **LG TV Screen**
+5. Restart Home Assistant
+
+In Home Assistant, go to Settings → Devices & services → Add integration → **LG TV Screen**, and choose the TV that is already in **LG webOS TV**. No second prompt. The camera is added to that same device.
+
+### Manual
+
 Copy `custom_components/lg_tv_screen` into your Home Assistant config directory:
 
 ```text
 config/custom_components/lg_tv_screen
 ```
 
-Restart Home Assistant, then add **LG TV Screen** and choose the TV that is already in **LG webOS TV**. No second prompt. The camera is added to that same device.
+Restart Home Assistant, then add **LG TV Screen** the same way.
 
 The entity is a camera, for example `camera.lg_32lm6300pcb_screen`. `uses_media_player_connection` is true while it is sharing that socket.
 
@@ -75,4 +91,4 @@ The capture call and the webOS 4 payload come from existing projects:
 - [nicohabets/glowcast](https://github.com/nicohabets/glowcast) — webOS 4 refuses a full-screen capture that does not include width and height. The working payload is 960×540, `DISPLAY`, `JPG`, path under `/tmp`.
 - [undefjs/ha-webos-camera](https://github.com/undefjs/ha-webos-camera) — a camera that shells into a **rooted** TV over SSH. This integration does not do that. A stock 32LM6300PCB does not need root for `executeOneShot`.
 
-When you publish this repository, point `documentation` in `custom_components/lg_tv_screen/manifest.json` at that URL. It currently points at aiowebostv, which is the library, not this integration.
+To list it in the default HACS store, open a request in [hacs/default](https://github.com/hacs/default). Custom repositories work without that request. The GitHub repository needs a description, at least one topic, issues enabled, and an OSI license. Those are set on the repository; HACS reads them from GitHub.
