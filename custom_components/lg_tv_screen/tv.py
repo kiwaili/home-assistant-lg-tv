@@ -32,15 +32,19 @@ from .const import (
     CONF_CAPTURE_HEIGHT,
     CONF_CAPTURE_METHOD,
     CONF_CAPTURE_WIDTH,
+    CONF_ENABLED,
     CONF_FRAME_INTERVAL,
     CONF_MODEL,
     CONF_WEBOS_ENTRY,
     CONF_WEBOS_VERSION,
     CONNECT_TIMEOUT,
+    DEFAULT_ENABLED,
     DEFAULT_FRAME_INTERVAL,
     DEFAULT_HEIGHT,
     DEFAULT_METHOD,
     DEFAULT_WIDTH,
+    MAX_FRAME_INTERVAL,
+    MIN_FRAME_INTERVAL,
     DOMAIN,
     PROTECTED_COOLDOWN,
     RECONNECT_INTERVAL,
@@ -120,6 +124,42 @@ class LgTvScreenRuntime:
         unique_id = self.entry.unique_id or self.entry.entry_id
         return {(DOMAIN, unique_id)}
 
+    @property
+    def enabled(self) -> bool:
+        """Return whether picture capture is turned on."""
+        return bool(self.entry.options.get(CONF_ENABLED, DEFAULT_ENABLED))
+
+    @property
+    def frame_interval(self) -> int:
+        """Return the refresh interval in seconds."""
+        try:
+            value = int(self.entry.options.get(CONF_FRAME_INTERVAL, DEFAULT_FRAME_INTERVAL))
+        except (TypeError, ValueError):
+            return DEFAULT_FRAME_INTERVAL
+        return min(MAX_FRAME_INTERVAL, max(MIN_FRAME_INTERVAL, value))
+
+    def set_enabled(self, enabled: bool) -> None:
+        """Turn picture capture on or off without closing the TV socket."""
+        if enabled:
+            self._cache = None
+            self._cache_key = None
+        self._update_option(CONF_ENABLED, enabled)
+
+    def set_frame_interval(self, seconds: int) -> None:
+        """Set how many seconds the dashboard waits between stills."""
+        value = min(MAX_FRAME_INTERVAL, max(MIN_FRAME_INTERVAL, int(seconds)))
+        self._cache_key = None
+        self._update_option(CONF_FRAME_INTERVAL, value)
+
+    def _update_option(self, key: str, value: Any) -> None:
+        """Store one option and refresh entities. Other options stay as they are."""
+        options = dict(self.entry.options)
+        if options.get(key) == value:
+            return
+        options[key] = value
+        self.hass.config_entries.async_update_entry(self.entry, options=options)
+        self._notify()
+
     def is_connected(self) -> bool:
         """Return whether the webOS websocket is up."""
         client = self._current_client()
@@ -151,6 +191,9 @@ class LgTvScreenRuntime:
         """Capture the current picture, including the video plane when the TV allows it."""
         async with self._lock:
             if self._closing:
+                return None
+            if not self.enabled:
+                self.last_error = "disabled"
                 return None
             try:
                 client = await self._activate_locked(connect_owned=True)
@@ -478,9 +521,7 @@ class LgTvScreenRuntime:
         """Return the cached JPEG when it is still inside the refresh interval."""
         if self._cache is None or self._cache_key != key:
             return None
-        interval = float(
-            self.entry.options.get(CONF_FRAME_INTERVAL, DEFAULT_FRAME_INTERVAL)
-        )
+        interval = float(self.frame_interval)
         if asyncio.get_running_loop().time() - self._cache_at >= interval:
             return None
         return self._cache

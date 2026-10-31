@@ -39,7 +39,13 @@ config/custom_components/lg_tv_screen
 
 Restart Home Assistant, then add **LG TV Screen** the same way.
 
-The entity is a camera, for example `camera.lg_32lm6300pcb_screen`. `uses_media_player_connection` is true while it is sharing that socket.
+The device has three entities:
+
+- **Screen**, the camera, for example `camera.lg_32lm6300pcb_screen`
+- **Capture**, a switch. Off stops new pictures and does not close the TV connection. On takes a new still on the next refresh.
+- **Interval**, seconds between stills, from 2 to 300. The default is 10.
+
+Add **Capture** and **Interval** to the dashboard next to the picture card. `uses_media_player_connection` is true while the camera is sharing the LG webOS TV socket.
 
 On webOS 4.10 the capture is **960×540 JPEG**. That size is required: this generation returns an error when width and height are left out. The default method is **Auto**. Auto asks the video-plane service first (`SCREEN_WITH_SOURCE_VIDEO`, then `VIDEO`, `SOURCE` and `BLENDED`) and keeps the first frame that is not flat black. That is the path that includes Netflix, Disney+ and HDMI when this firmware composites the video plane into the capture. `capture_method` and `capture_service` on the entity show which call produced the current still.
 
@@ -63,6 +69,7 @@ The camera refreshes every 10 seconds by default (2–300). A request inside tha
 
 | Value | Meaning |
 | --- | --- |
+| `disabled` | Capture is turned off. |
 | `not_connected` | The TV did not accept the websocket. It is usually off. |
 | `not_paired` | The pairing key was rejected. Home Assistant starts pairing again. |
 | `screen_off` | The panel is off. |

@@ -6,10 +6,9 @@ from typing import Any
 
 from homeassistant.components.camera import Camera, CameraEntityDescription
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_FRAME_INTERVAL, DEFAULT_FRAME_INTERVAL
+from .entity import LgTvScreenEntity
 from .tv import LgTvScreenConfigEntry, LgTvScreenRuntime
 
 SCREEN_CAMERA = CameraEntityDescription(
@@ -28,20 +27,17 @@ async def async_setup_entry(
     async_add_entities([LgTvScreenCamera(entry.runtime_data, entry)])
 
 
-class LgTvScreenCamera(Camera):
+class LgTvScreenCamera(LgTvScreenEntity, Camera):
     """A still of the TV picture, refreshed on each request."""
 
     entity_description = SCREEN_CAMERA
-    _attr_has_entity_name = True
     _attr_content_type = "image/jpeg"
 
     def __init__(
         self, runtime: LgTvScreenRuntime, entry: LgTvScreenConfigEntry
     ) -> None:
         """Attach the camera to the TV device."""
-        super().__init__()
-        self._runtime = runtime
-        self._entry = entry
+        super().__init__(runtime, entry)
         self._attr_unique_id = f"{entry.unique_id}_screen"
 
     @property
@@ -52,23 +48,7 @@ class LgTvScreenCamera(Camera):
     @property
     def frame_interval(self) -> float:
         """Seconds the frontend should wait between stills."""
-        return float(
-            self._entry.options.get(CONF_FRAME_INTERVAL, DEFAULT_FRAME_INTERVAL)
-        )
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Identify the TV. Share the media-player device when that integration is set up."""
-        identifiers = self._runtime.device_identifiers()
-        if self._runtime.linked_webostv_unique_id:
-            return DeviceInfo(identifiers=identifiers)
-        return DeviceInfo(
-            identifiers=identifiers,
-            manufacturer="LG",
-            model=self._runtime.model,
-            name=self._entry.title,
-            sw_version=self._runtime.webos_version,
-        )
+        return float(self._runtime.frame_interval)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -90,11 +70,6 @@ class LgTvScreenCamera(Camera):
         if self._runtime.last_error:
             attributes["last_error"] = self._runtime.last_error
         return attributes
-
-    async def async_added_to_hass(self) -> None:
-        """Refresh state when the TV connects or the panel turns on."""
-        await super().async_added_to_hass()
-        self.async_on_remove(self._runtime.add_listener(self.async_write_ha_state))
 
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None

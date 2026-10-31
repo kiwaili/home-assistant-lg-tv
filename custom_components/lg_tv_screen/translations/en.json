@@ -61,6 +61,7 @@
         "title": "Screen capture",
         "description": "Auto tries the video-plane capture first, which is what includes Netflix, Disney+ and HDMI on webOS 4.10. 960×540 is required on this generation. A flat black frame means the TV withheld that picture.",
         "data": {
+          "enabled": "Capture",
           "frame_interval": "Refresh interval (seconds)",
           "capture_width": "Capture width",
           "capture_height": "Capture height",
@@ -73,6 +74,16 @@
     "camera": {
       "screen": {
         "name": "Screen"
+      }
+    },
+    "number": {
+      "interval": {
+        "name": "Interval"
+      }
+    },
+    "switch": {
+      "capture": {
+        "name": "Capture"
       }
     }
   }

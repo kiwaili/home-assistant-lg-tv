@@ -33,11 +33,13 @@ from .const import (
     CONF_CAPTURE_HEIGHT,
     CONF_CAPTURE_METHOD,
     CONF_CAPTURE_WIDTH,
+    CONF_ENABLED,
     CONF_FRAME_INTERVAL,
     CONF_MODEL,
     CONF_WEBOS_ENTRY,
     CONF_WEBOS_VERSION,
     CONNECT_TIMEOUT,
+    DEFAULT_ENABLED,
     DEFAULT_FRAME_INTERVAL,
     DEFAULT_NAME,
     DOMAIN,
@@ -390,13 +392,19 @@ class LgTvScreenOptionsFlow(OptionsFlowWithReload):
     ) -> ConfigFlowResult:
         """Save capture options."""
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            return self.async_create_entry(
+                title="", data={**self.config_entry.options, **user_input}
+            )
 
         options = self.config_entry.options
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
+                    vol.Required(
+                        CONF_ENABLED,
+                        default=options.get(CONF_ENABLED, DEFAULT_ENABLED),
+                    ): cv.boolean,
                     vol.Required(
                         CONF_FRAME_INTERVAL,
                         default=options.get(CONF_FRAME_INTERVAL, DEFAULT_FRAME_INTERVAL),

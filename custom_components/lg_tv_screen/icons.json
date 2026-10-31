@@ -4,6 +4,16 @@
       "screen": {
         "default": "mdi:monitor-screenshot"
       }
+    },
+    "number": {
+      "interval": {
+        "default": "mdi:timer-outline"
+      }
+    },
+    "switch": {
+      "capture": {
+        "default": "mdi:monitor-screenshot"
+      }
     }
   }
 }

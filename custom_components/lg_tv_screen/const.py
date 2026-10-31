@@ -18,11 +18,13 @@ DEFAULT_NAME = "LG TV"
 CONF_MODEL = "model"
 CONF_WEBOS_VERSION = "webos_version"
 CONF_WEBOS_ENTRY = "webos_entry_id"
+CONF_ENABLED = "enabled"
 CONF_FRAME_INTERVAL = "frame_interval"
 CONF_CAPTURE_WIDTH = "capture_width"
 CONF_CAPTURE_HEIGHT = "capture_height"
 CONF_CAPTURE_METHOD = "capture_method"
 
+DEFAULT_ENABLED = True
 DEFAULT_FRAME_INTERVAL = 10
 MIN_FRAME_INTERVAL = 2
 MAX_FRAME_INTERVAL = 300
@@ -35,18 +37,20 @@ RECONNECT_INTERVAL = 30
 # After a blank video plane, wait before probing every capture method again.
 PROTECTED_COOLDOWN = 60
 
-PLATFORMS: list[Platform] = [Platform.CAMERA]
+PLATFORMS: list[Platform] = [Platform.CAMERA, Platform.NUMBER, Platform.SWITCH]
 
 __all__ = [
     "CAPTURE_METHODS",
     "CONF_CAPTURE_HEIGHT",
     "CONF_CAPTURE_METHOD",
     "CONF_CAPTURE_WIDTH",
+    "CONF_ENABLED",
     "CONF_FRAME_INTERVAL",
     "CONF_MODEL",
     "CONF_WEBOS_ENTRY",
     "CONF_WEBOS_VERSION",
     "CONNECT_TIMEOUT",
+    "DEFAULT_ENABLED",
     "DEFAULT_FRAME_INTERVAL",
     "DEFAULT_HEIGHT",
     "DEFAULT_METHOD",
