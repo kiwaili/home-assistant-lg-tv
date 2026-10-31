@@ -1,16 +1,16 @@
 {
   "domain": "lg_tv_screen",
   "name": "LG TV Screen",
-  "codeowners": ["@kiwaili"],
   "after_dependencies": ["webostv"],
   "categories": ["media_entertainment.tv_streaming", "security_safety.cameras"],
+  "codeowners": ["@kiwaili"],
   "config_flow": true,
   "documentation": "https://github.com/kiwaili/home-assistant-lg-tv",
-  "issue_tracker": "https://github.com/kiwaili/home-assistant-lg-tv/issues",
   "integration_type": "device",
   "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/kiwaili/home-assistant-lg-tv/issues",
   "loggers": ["aiowebostv"],
-  "requirements": ["aiowebostv==0.10.0"],
+  "requirements": ["aiowebostv>=0.10.0"],
   "ssdp": [
     {
       "st": "urn:lge-com:service:webos-second-screen:1"

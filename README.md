@@ -93,7 +93,7 @@ The camera refreshes every 10 seconds by default (2–300). A request inside tha
 
 The capture call and the webOS 4 payload come from existing projects:
 
-- [home-assistant-libs/aiowebostv](https://github.com/home-assistant-libs/aiowebostv) — pairing and the SSAP websocket used by Home Assistant's LG webOS TV integration. This component requires `aiowebostv==0.10.0`, the same release Home Assistant core pins.
+- [home-assistant-libs/aiowebostv](https://github.com/home-assistant-libs/aiowebostv) — pairing and the SSAP websocket used by Home Assistant's LG webOS TV integration. This component requires `aiowebostv>=0.10.0` and uses the copy Home Assistant already installed.
 - [chros73/bscpylgtv](https://github.com/chros73/bscpylgtv) — `executeOneShot` methods. `DISPLAY` is the graphics plane. `SCREEN_WITH_SOURCE_VIDEO`, `VIDEO`, `SOURCE` and `BLENDED` include the video plane.
 - [nicohabets/glowcast](https://github.com/nicohabets/glowcast) — webOS 4 refuses a full-screen capture that does not include width and height. The working payload is 960×540, `DISPLAY`, `JPG`, path under `/tmp`.
 - [undefjs/ha-webos-camera](https://github.com/undefjs/ha-webos-camera) — a camera that shells into a **rooted** TV over SSH. This integration does not do that. A stock 32LM6300PCB does not need root for `executeOneShot`.
