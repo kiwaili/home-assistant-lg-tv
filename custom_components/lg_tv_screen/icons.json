@@ -1,0 +1,9 @@
+{
+  "entity": {
+    "camera": {
+      "screen": {
+        "default": "mdi:monitor-screenshot"
+      }
+    }
+  }
+}

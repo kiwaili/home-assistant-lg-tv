@@ -1,0 +1,79 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Choose the TV",
+        "description": "Select the TV already set up in the LG webOS TV integration. Screen capture uses that connection, so the media player stays connected. Pair separately only for a TV that is not in that list.",
+        "data": {
+          "webos_entry_id": "TV"
+        }
+      },
+      "manual": {
+        "title": "Connect to an LG webOS TV",
+        "description": "Enter the TV's IP address. The TV must be on. This pairs with its own key and does not use the media player's connection.",
+        "data": {
+          "host": "Host"
+        }
+      },
+      "pairing": {
+        "title": "Pair with the TV",
+        "description": "Submit, then accept the connection prompt on the TV with the remote. You have about ten seconds."
+      },
+      "attach": {
+        "title": "Use the existing LG webOS TV connection",
+        "description": "This TV is already paired with Home Assistant. Screen capture will share that connection and will not open a second one."
+      },
+      "reauth_confirm": {
+        "title": "Pair again",
+        "description": "The TV rejected the saved pairing. Submit, then accept the new prompt on the TV."
+      },
+      "reconfigure": {
+        "title": "Update the TV address",
+        "description": "Change the host if the TV's IP address changed. The existing pairing key is kept.",
+        "data": {
+          "host": "Host"
+        }
+      },
+      "reconfigure_shared": {
+        "title": "Address follows LG webOS TV",
+        "description": "This screen uses the LG webOS TV connection. Change the TV's address on that integration. Doing it here would open a second connection."
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect. Check the IP address and that the TV is on.",
+      "error_pairing": "The TV rejected pairing. Accept the prompt on the TV and try again.",
+      "unknown": "Unexpected error. See the Home Assistant log."
+    },
+    "abort": {
+      "already_configured": "This TV is already configured.",
+      "already_in_progress": "This TV is already being configured.",
+      "cannot_connect": "Could not connect to the discovered TV.",
+      "reauth_successful": "Pairing restored.",
+      "reconfigure_successful": "TV address updated.",
+      "wrong_device": "That address is a different TV.",
+      "use_webostv_reauth": "This screen uses the LG webOS TV connection. Pair again on that integration."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Screen capture",
+        "description": "Auto tries the video-plane capture first, which is what includes Netflix, Disney+ and HDMI on webOS 4.10. 960×540 is required on this generation. A flat black frame means the TV withheld that picture.",
+        "data": {
+          "frame_interval": "Refresh interval (seconds)",
+          "capture_width": "Capture width",
+          "capture_height": "Capture height",
+          "capture_method": "Capture method"
+        }
+      }
+    }
+  },
+  "entity": {
+    "camera": {
+      "screen": {
+        "name": "Screen"
+      }
+    }
+  }
+}

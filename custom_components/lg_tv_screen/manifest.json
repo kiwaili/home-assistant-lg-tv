@@ -1,0 +1,18 @@
+{
+  "domain": "lg_tv_screen",
+  "name": "LG TV Screen",
+  "codeowners": [],
+  "after_dependencies": ["webostv"],
+  "config_flow": true,
+  "documentation": "https://github.com/home-assistant-libs/aiowebostv",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "loggers": ["aiowebostv"],
+  "requirements": ["aiowebostv==0.10.0"],
+  "ssdp": [
+    {
+      "st": "urn:lge-com:service:webos-second-screen:1"
+    }
+  ],
+  "version": "0.2.0"
+}
