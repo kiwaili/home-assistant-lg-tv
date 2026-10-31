@@ -4,7 +4,7 @@
 
 Home Assistant custom integration that captures a still of what an LG webOS TV is showing. Written for a **32LM6300PCB on webOS 4.10**. The same screenshot call works on other webOS 4 sets.
 
-The TV has no video stream for the panel. Each refresh is a new JPEG. On webOS 4 the picture, including HDMI and streaming apps, comes from `com.webos.service.tv.capture/executeOneShot` with method `SCREEN_WITH_SOURCE_VIDEO`. The older `tv/executeOneShot` `DISPLAY` call often returns only the graphics plane, which is a black video area.
+The TV has no video stream for the panel. Each refresh is a new JPEG. On webOS 4 the picture comes from `tv/executeOneShot` (`DISPLAY`, 960×540, JPG), which returns an HTTP link to the JPEG and includes the video plane when width and height are set. If that frame is black in the middle, the next calls try `SCREEN_WITH_SOURCE_VIDEO`, `VIDEO`, `SOURCE` and `BLENDED`.
 
 ## What you need
 
@@ -47,7 +47,7 @@ The device has three entities:
 
 Add **Capture** and **Interval** to the dashboard next to the picture card. `uses_media_player_connection` is true while the camera is sharing the LG webOS TV socket.
 
-On webOS 4.10 the capture is **960×540 JPEG**. That size is required: this generation returns an error when width and height are left out. The default method is **Auto**. Auto asks the video-plane service first (`SCREEN_WITH_SOURCE_VIDEO`, then `VIDEO`, `SOURCE` and `BLENDED`) and keeps the first frame that is not flat black. That is the path that includes Netflix, Disney+ and HDMI when this firmware composites the video plane into the capture. `capture_method` and `capture_service` on the entity show which call produced the current still.
+On webOS 4.10 the capture is **960×540 JPEG**. That size is required: this generation returns an error when width and height are left out. The default method is **Auto**. Auto calls `tv/executeOneShot` first and keeps the first frame whose video area is not flat black. `capture_method` and `capture_service` on the entity show which call produced the current still. A failed capture is logged once as `Screen capture failed` with the reason.
 
 ## Use the picture
 

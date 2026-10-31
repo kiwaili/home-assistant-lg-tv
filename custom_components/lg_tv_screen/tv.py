@@ -11,6 +11,7 @@ import aiohttp
 from aiowebostv import WebOsClient
 from aiowebostv.exceptions import (
     WebOsTvCommandError,
+    WebOsTvCommandTimeoutError,
     WebOsTvError,
     WebOsTvPairError,
     WebOsTvResponseTypeError,
@@ -25,7 +26,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .capture import (
     attempts_for,
     build_capture_payload,
-    capture_download_url,
+    capture_download_urls,
+    jpeg_center_is_blank,
     jpeg_is_blank,
 )
 from .const import (
@@ -56,7 +58,8 @@ _LOGGER = logging.getLogger(__name__)
 
 _JPEG_SOI = b"\xff\xd8"
 _INSUFFICIENT_PERMISSIONS = "401 insufficient permissions"
-_STOP_ERRORS = {"not_permitted", "timed_out", "download_failed"}
+_STOP_ERRORS = {"not_permitted"}
+_SCREEN_OFF_STATES = {"Power Off", "Suspend", "Screen Off"}
 _UNREACHABLE = (
     TimeoutError,
     OSError,
@@ -101,6 +104,8 @@ class LgTvScreenRuntime:
         self._reauth_started = False
         self._closing = False
         self._fallback_logged: tuple[int, int] | None = None
+        self._logged_failure: tuple[str | None, str | None] | None = None
+        self._missing_client_logged = False
 
     def add_listener(self, update: Callable[[], None]) -> Callable[[], None]:
         """Register a callback for connection and power changes."""
@@ -166,14 +171,17 @@ class LgTvScreenRuntime:
         return client is not None and client.is_connected()
 
     def screen_is_on(self) -> bool:
-        """Return whether the TV is on and the panel is not in screen-off."""
+        """Return whether the panel is on.
+
+        webOS 4 often reports Active Standby while a picture is on screen.
+        Capture is skipped only for an explicit off state.
+        """
         client = self._current_client()
         if client is None or not client.is_connected():
             return False
-        state = client.tv_state
-        if not state.power_state and not state.current_app_id:
-            return True
-        return bool(state.is_on and state.is_screen_on)
+        power = client.tv_state.power_state
+        name = power.get("state") if isinstance(power, dict) else None
+        return name not in _SCREEN_OFF_STATES
 
     def current_app_id(self) -> str | None:
         """Return the foreground app id, when the socket is up."""
@@ -194,6 +202,7 @@ class LgTvScreenRuntime:
                 return None
             if not self.enabled:
                 self.last_error = "disabled"
+                self._log_capture_result(None)
                 return None
             try:
                 client = await self._activate_locked(connect_owned=True)
@@ -202,10 +211,12 @@ class LgTvScreenRuntime:
             if client is None or not client.is_connected():
                 self.last_error = "not_connected"
                 self._cache = None
+                self._log_capture_result(None)
                 return None
             if not self.screen_is_on():
                 self.last_error = "screen_off"
                 self._cache = None
+                self._log_capture_result(None)
                 return None
 
             app_id = client.tv_state.current_app_id or ""
@@ -227,16 +238,19 @@ class LgTvScreenRuntime:
                 sizes.append((DEFAULT_WIDTH, DEFAULT_HEIGHT))
 
             last_error = "refused"
+            last_detail: str | None = None
             for size in sizes:
-                image, error = await self._probe(
+                image, error, detail = await self._probe(
                     client, size[0], size[1], attempts_for(method), app_id
                 )
                 if error == "protected" and image is not None:
                     self.last_error = "protected"
                     self._store_cache(key, image, "protected")
+                    self._log_capture_result(detail)
                     return image
                 if image is not None and error is None:
                     self.last_error = None
+                    self._logged_failure = None
                     self._store_cache(key, image, None)
                     if size != (width, height) and self._fallback_logged != (width, height):
                         self._fallback_logged = (width, height)
@@ -253,11 +267,14 @@ class LgTvScreenRuntime:
                     return image
                 if error in _STOP_ERRORS:
                     self.last_error = error
+                    self._log_capture_result(detail)
                     return None
                 if error:
                     last_error = error
+                    last_detail = detail
 
             self.last_error = last_error
+            self._log_capture_result(last_detail)
             return None
 
     async def async_close(self) -> None:
@@ -374,16 +391,19 @@ class LgTvScreenRuntime:
         height: int,
         attempts: tuple[_Attempt, ...],
         app_id: str,
-    ) -> tuple[bytes | None, str | None]:
-        """Try capture calls until one returns a picture that is not a blank video plane."""
+    ) -> tuple[bytes | None, str | None, str | None]:
+        """Try capture calls until one returns a picture that includes the video."""
         ordered = attempts
         if self._winner and self._winner_app == app_id and self._winner in attempts:
             ordered = (self._winner, *(item for item in attempts if item != self._winner))
 
         not_found = 0
         refused = 0
+        timed_out = 0
         download_failed = False
+        detail: str | None = None
         blank: bytes | None = None
+        shell: bytes | None = None
         for attempt in ordered:
             uri, method, image_format = attempt
             payload = build_capture_payload(width, height, method, image_format)
@@ -391,27 +411,38 @@ class LgTvScreenRuntime:
                 response = await client.request(uri, payload)
             except WebOsTvServiceNotFoundError:
                 not_found += 1
+                detail = f"{uri} is not available"
+                continue
+            except WebOsTvCommandTimeoutError:
+                timed_out += 1
+                detail = f"{uri} {method} timed out"
                 continue
             except WebOsTvResponseTypeError as err:
                 if _insufficient_permissions(err):
-                    return None, "not_permitted"
+                    return None, "not_permitted", _short_error(err)
                 refused += 1
+                detail = _short_error(err)
                 continue
-            except WebOsTvCommandError:
+            except WebOsTvCommandError as err:
                 refused += 1
+                detail = _short_error(err)
                 continue
             except TimeoutError:
-                return None, "timed_out"
+                timed_out += 1
+                detail = f"{uri} {method} timed out"
+                continue
 
-            url = capture_download_url(response, self.host, str(payload["path"]))
+            urls = capture_download_urls(response, self.host, str(payload["path"]))
             try:
-                data = await self._download(url)
-            except (TimeoutError, aiohttp.ClientError, OSError):
-                _LOGGER.debug("Could not download %s %s", uri, method)
+                data = await self._download(urls)
+            except (TimeoutError, aiohttp.ClientError, OSError) as err:
+                _LOGGER.debug("Could not download %s %s: %s", uri, method, err)
                 download_failed = True
+                detail = f"could not download {method}"
                 continue
             if not data.startswith(_JPEG_SOI):
                 refused += 1
+                detail = f"{method} did not return a JPEG"
                 continue
 
             self.captured_size = (width, height)
@@ -419,6 +450,11 @@ class LgTvScreenRuntime:
             self.capture_uri = uri
             if jpeg_is_blank(data):
                 blank = data
+                detail = f"{uri} {method} returned a black frame"
+                continue
+            if jpeg_center_is_blank(data):
+                shell = shell or data
+                detail = f"{uri} {method} returned a black video area"
                 continue
 
             self._winner = attempt
@@ -427,26 +463,50 @@ class LgTvScreenRuntime:
             if self._logged_attempt != attempt:
                 self._logged_attempt = attempt
                 _LOGGER.info("Capturing with %s method %s", uri, method)
-            return data, None
+            return data, None, None
 
+        if shell is not None:
+            self._protected_app = app_id or None
+            self._protected_at = asyncio.get_running_loop().time()
+            return shell, "protected", detail
         if blank is not None:
             self._protected_app = app_id or None
             self._protected_at = asyncio.get_running_loop().time()
-            return blank, "protected"
-        if download_failed and not refused and not not_found:
-            return None, "download_failed"
+            return blank, "protected", detail
+        if download_failed and not refused:
+            return None, "download_failed", detail
+        if timed_out and not refused:
+            return None, "timed_out", detail
         if not_found and not refused:
-            return None, "not_supported"
-        return None, "refused"
+            return None, "not_supported", detail
+        return None, "refused", detail
 
-    async def _download(self, url: str) -> bytes:
-        """Download the JPEG. Retry once; the 2019 set can lag behind the URI."""
+    async def _download(self, urls: list[str]) -> bytes:
+        """Download the JPEG from HTTP :3000 or HTTPS :3001.
+
+        Each URL is retried once when the file is not there yet. The other
+        port is tried when the first one errors, including a 404, because
+        webOS sometimes names the wrong port.
+        """
+        last_error: Exception | None = None
+        for url in urls:
+            try:
+                return await self._download_one(url)
+            except (TimeoutError, aiohttp.ClientError, OSError) as err:
+                last_error = err
+                continue
+        if last_error is not None:
+            raise last_error
+        raise aiohttp.ClientError("capture file was not available")
+
+    async def _download_one(self, url: str) -> bytes:
+        """Download one URL. Retry once when the file is not there yet."""
         session = async_get_clientsession(self.hass)
-        timeout = aiohttp.ClientTimeout(total=10)
+        timeout = aiohttp.ClientTimeout(total=5)
         for attempt in (1, 2):
             async with session.get(url, ssl=False, timeout=timeout) as response:
                 if response.status == 404 and attempt == 1:
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.4)
                     continue
                 response.raise_for_status()
                 return await response.read()
@@ -468,7 +528,14 @@ class LgTvScreenRuntime:
         host = entry_host(entry)
         if host:
             self.host = host
-        return shared_client(entry)
+        client = shared_client(entry)
+        if client is None and not self._missing_client_logged:
+            self._missing_client_logged = True
+            _LOGGER.warning(
+                "LG webOS TV is set up for %s but its websocket was not found",
+                self.host,
+            )
+        return client
 
     def _current_client(self) -> WebOsClient | None:
         """Return the shared client, or our own if the media player is not set up."""
@@ -559,6 +626,19 @@ class LgTvScreenRuntime:
             except Exception:
                 _LOGGER.exception("Screen listener failed")
 
+    def _log_capture_result(self, detail: str | None) -> None:
+        """Log a capture failure once per distinct reason."""
+        signature = (self.last_error, detail)
+        if signature == self._logged_failure:
+            return
+        self._logged_failure = signature
+        if not self.last_error:
+            return
+        if detail:
+            _LOGGER.warning("Screen capture failed (%s): %s", self.last_error, detail)
+            return
+        _LOGGER.warning("Screen capture failed (%s)", self.last_error)
+
     def _start_reauth(self) -> None:
         """Ask Home Assistant to pair again. Never for the media player's key."""
         if self._reauth_started or self._closing or self._using_shared:
@@ -567,6 +647,14 @@ class LgTvScreenRuntime:
             return
         self._reauth_started = True
         self.entry.async_start_reauth(self.hass)
+
+
+def _short_error(err: Exception) -> str:
+    """Return a single-line reason safe to put in the log."""
+    text = " ".join(str(err).split())
+    if len(text) > 180:
+        return text[:177] + "..."
+    return text or err.__class__.__name__
 
 
 def _insufficient_permissions(err: WebOsTvResponseTypeError) -> bool:

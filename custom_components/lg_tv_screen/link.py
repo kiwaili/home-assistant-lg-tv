@@ -51,12 +51,15 @@ def matching_webostv_entry(
 def shared_client(entry: ConfigEntry) -> WebOsClient | None:
     """Return the live client for a loaded LG webOS TV entry.
 
-    ``runtime_data.client`` is the object the media player uses. Connecting
-    again with its key is what drops that player.
+    Through mid-2026 ``runtime_data`` is the ``WebOsClient``. After the
+    coordinator change it is ``runtime_data.client``. Connecting again with
+    that key is what drops the media player.
     """
     if entry.state is not ConfigEntryState.LOADED:
         return None
     runtime = entry.runtime_data
+    if isinstance(runtime, WebOsClient):
+        return runtime
     client = getattr(runtime, "client", None)
     if isinstance(client, WebOsClient):
         return client
