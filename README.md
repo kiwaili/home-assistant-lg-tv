@@ -4,7 +4,7 @@
 
 Home Assistant custom integration that captures a still of what an LG webOS TV is showing. Written for a **32LM6300PCB on webOS 4.10**. The same screenshot call works on other webOS 4 sets.
 
-The TV has no video stream for the panel. Each refresh is a new JPEG. On webOS 4 the picture comes from `tv/executeOneShot` (`DISPLAY`, 960×540, JPG), which returns an HTTP link to the JPEG and includes the video plane when width and height are set. If that frame is black in the middle, the next calls try `SCREEN_WITH_SOURCE_VIDEO`, `VIDEO`, `SOURCE` and `BLENDED`.
+The TV has no continuous video feed. Each frame is a new JPEG. Open the camera, or set a card's **Camera view** to **Live**, and Home Assistant plays those frames as video at the **Interval**. On webOS 4 the picture comes from `tv/executeOneShot` (`DISPLAY`, 960×540, JPG), which returns an HTTP link to the JPEG and includes the video plane when width and height are set. If that frame is black in the middle, the next calls try `SCREEN_WITH_SOURCE_VIDEO`, `VIDEO`, `SOURCE` and `BLENDED`.
 
 ## What you need
 
@@ -43,7 +43,7 @@ The device has three entities:
 
 - **Screen**, the camera, for example `camera.lg_32lm6300pcb_screen`
 - **Capture**, a switch. Off stops new pictures and does not close the TV connection. On takes a new still on the next refresh.
-- **Interval**, seconds between stills, from 2 to 300. The default is 10.
+- **Interval**, seconds between pictures, from 2 to 300. The default is 10. A live view advances at this rate.
 
 Add **Capture** and **Interval** to the dashboard next to the picture card. `uses_media_player_connection` is true while the camera is sharing the LG webOS TV socket.
 
@@ -51,7 +51,18 @@ On webOS 4.10 the capture is **960×540 JPEG**. That size is required: this gene
 
 ## Use the picture
 
-Open the camera entity, or add a picture glance / picture entity card.
+Open the camera entity. The dialog plays the screen as video.
+
+On a dashboard, add a **Picture entity** card, choose the **Screen** camera, and set **Camera view** to **Live**:
+
+```yaml
+type: picture-entity
+entity: camera.lg_32lm6300pcb_screen
+camera_view: live
+show_state: false
+```
+
+**Auto** keeps a still and asks for it again on the dashboard's own timer. **Live** holds one connection open and shows the next JPEG each time **Interval** elapses. While that view is open the camera state is `streaming`. Changing **Interval** applies the next time the view is opened. Two seconds is the fastest the TV is asked.
 
 Save a still from an automation:
 
@@ -63,7 +74,7 @@ data:
   filename: /media/tv.jpg
 ```
 
-The camera refreshes every 10 seconds by default (2–300). A request inside that window returns the last JPEG instead of asking the TV again.
+The camera takes a new JPEG every 10 seconds by default (2–300). A request inside that window returns the last JPEG instead of asking the TV again. Live view uses the same window, so it does not capture faster than **Interval**.
 
 `last_error` on the entity is empty when the last capture worked. Other values:
 
@@ -85,7 +96,7 @@ The camera refreshes every 10 seconds by default (2–300). A request inside tha
 
 ## Limits
 
-- Stills, not a live video stream. webOS has no continuous capture API.
+- Live view is those JPEGs played in order. webOS has no RTSP or HLS capture API, so this is not a native video stream from the panel.
 - Auto includes the video plane. If the firmware still returns a uniform black frame for a protected app or an HDCP source, `last_error` is `protected`. This integration does not root the TV or strip HDCP; it can only show the picture the capture service returns.
 - After a blank result, the same app is not probed again for 60 seconds.
 
